@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from './Card';
 import { Icon } from './Icon';
 import { Slider } from './Slider';
-import { Todo, Task, Session, DailySummary, View } from '../types';
+import { Todo, Task, DailySummary, View, TaskCategory } from '../types';
 import { useStopwatch } from '../hooks/useStopwatch';
 
 interface DashboardProps {
@@ -16,13 +15,12 @@ interface DashboardProps {
     reorderTasks: (startIndex: number, endIndex: number) => void;
     deleteTask: (id: number) => void;
     reactivateTask: (id: number) => void;
-    sessionHistory: Session[];
     dailyHistory: DailySummary[];
     onDeleteDailySummary: (id: number) => void;
     onNewDay: () => void;
     
     todos: Todo[];
-    addTodo: (text: string) => void;
+    addTodo: (text: string, category: TaskCategory) => void;
     toggleTodo: (id: number) => void;
     removeTodo: (id: number) => void;
     reorderTodos: (startIndex: number, endIndex: number) => void;
@@ -48,12 +46,6 @@ const formatStopwatchTime = (timeInSeconds: number) => {
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-const formatSessionDuration = (totalSeconds: number) => {
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-}
-
 const getKpiColorClass = (value: number) => {
     if (value >= 8) return 'text-green-700 dark:text-green-400';
     if (value >= 6) return 'text-green-500 dark:text-green-500';
@@ -73,16 +65,19 @@ const formatSecondsToHoursMinutes = (totalSeconds: number) => {
 
 
 export const Dashboard: React.FC<DashboardProps> = ({ 
-    tasks, activeTask, setActiveTaskId, onStartFocus, addTask, updateTask, reorderTasks, deleteTask, reactivateTask, sessionHistory, dailyHistory, onDeleteDailySummary, onNewDay,
+    tasks, activeTask, setActiveTaskId, onStartFocus, addTask, updateTask, reorderTasks, deleteTask, reactivateTask, dailyHistory, onDeleteDailySummary, onNewDay,
     todos, addTodo, toggleTodo, removeTodo, reorderTodos,
     energy, setEnergy, satisfaction, setSatisfaction, blockerNote, setBlockerNote,
     theme, onThemeChange,
     activeView, setActiveView
 }) => {
     const [newTodo, setNewTodo] = useState('');
+    const [newTodoCategory, setNewTodoCategory] = useState<TaskCategory>('Travail');
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [newTaskDescription, setNewTaskDescription] = useState('');
     const [newTaskTime, setNewTaskTime] = useState(30);
+    const [newTaskCategory, setNewTaskCategory] = useState<TaskCategory>('Travail');
+
 
     const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -121,9 +116,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
         }
     }
 
-    const handleAddTodo = () => {
-        addTodo(newTodo);
-        setNewTodo('');
+    const handleAddTodo = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newTodo.trim() !== '') {
+            addTodo(newTodo, newTodoCategory);
+            setNewTodo('');
+            setNewTodoCategory('Travail');
+        }
     };
 
     const handleAddTask = (e: React.FormEvent) => {
@@ -133,9 +132,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             title: newTaskTitle,
             description: newTaskDescription,
             estimatedTime: newTaskTime,
+            category: newTaskCategory,
         });
         setNewTaskTitle('');
         setNewTaskDescription('');
+        setNewTaskTime(30);
+        setNewTaskCategory('Travail');
     };
     
     // Drag handlers for Tasks
@@ -200,6 +202,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         setDragOverTodoIndex(null);
     };
 
+    const completedTodos = todos.filter(t => t.completed).length;
+    const totalTodos = todos.length;
     
     const tasksDone = tasks.filter(t => t.status === 'done').length;
     const totalSeconds = tasks.reduce((sum, task) => sum + task.actualTime, 0);
@@ -212,6 +216,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
         : 0;
     const deviationCardClass = avgDeviation <= 0 ? 'bg-green-100 dark:bg-green-900/50 border-green-200 dark:border-green-500/30' : 'bg-red-100 dark:bg-red-900/50 border-red-200 dark:border-red-500/30';
     const deviationTextClass = avgDeviation <= 0 ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300';
+    
+    const categoryColorClasses = {
+        'Travail': {
+            border: 'border-accent-blue',
+        },
+        'Ecole': {
+            border: 'border-accent-purple',
+        }
+    };
 
 
     return (
@@ -232,7 +245,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Column 1 */}
                     <div className="space-y-6">
-                        <Card title="À faire" iconName="check">
+                        <Card title="À faire" iconName="check" actions={totalTodos > 0 ? <span className="text-sm font-normal text-gray-400 dark:text-gray-500">{completedTodos}/{totalTodos}</span> : null}>
                             <div className="space-y-3" onDragLeave={handleTodoDragLeave}>
                                 {todos.map((todo, index) => {
                                     const isBeingDragged = draggedTodoIndex === index;
@@ -249,7 +262,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                           onDragOver={(e) => handleTodoDragOver(e, index)}
                                           onDrop={(e) => handleTodoDrop(e, index)}
                                           onDragEnd={handleTodoDragEnd}
-                                          className={`flex items-center justify-between bg-gray-100 dark:bg-gray-900/50 p-2 rounded-md transition-all ${isBeingDragged ? 'opacity-30 cursor-grabbing' : 'cursor-grab'} ${dropIndicatorClass}`}
+                                          className={`flex items-center justify-between bg-gray-100 dark:bg-gray-900/50 p-2 rounded-md transition-all ${isBeingDragged ? 'opacity-30 cursor-grabbing' : 'cursor-grab'} ${dropIndicatorClass} border-l-4 ${categoryColorClasses[todo.category].border}`}
                                         >
                                             <div className="flex items-center gap-2">
                                                 <input type="checkbox" checked={todo.completed} onChange={() => toggleTodo(todo.id)} className="form-checkbox h-4 w-4 rounded bg-gray-300 dark:bg-gray-700 border-gray-400 dark:border-gray-600 text-accent-blue focus:ring-accent-blue" />
@@ -262,19 +275,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                     );
                                 })}
                             </div>
-                            <div className="mt-4 flex gap-2">
-                                <input
-                                    type="text"
-                                    value={newTodo}
-                                    onChange={(e) => setNewTodo(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleAddTodo()}
-                                    placeholder="Ajouter une chose à faire..."
-                                    className="flex-grow bg-gray-100 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:ring-accent-blue focus:border-accent-blue"
-                                />
-                                <button onClick={handleAddTodo} className="bg-accent-blue text-white p-2 rounded-md hover:bg-blue-500">
-                                    <Icon name="plus" className="w-5 h-5" />
-                                </button>
-                            </div>
+                            <form onSubmit={handleAddTodo} className="mt-4 space-y-2">
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={newTodo}
+                                        onChange={(e) => setNewTodo(e.target.value)}
+                                        placeholder="Ajouter une chose à faire..."
+                                        className="flex-grow bg-gray-100 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:ring-accent-blue focus:border-accent-blue"
+                                    />
+                                    <button type="submit" className="bg-accent-blue text-white p-2 rounded-md hover:bg-blue-500">
+                                        <Icon name="plus" className="w-5 h-5" />
+                                    </button>
+                                </div>
+                                <div className="flex rounded-md bg-gray-200 dark:bg-gray-800 p-1">
+                                    <button type="button" onClick={() => setNewTodoCategory('Travail')} className={`w-full px-3 py-1 text-xs font-semibold rounded transition-colors ${newTodoCategory === 'Travail' ? 'bg-white dark:bg-gray-700 text-accent-blue shadow' : 'text-gray-500'}`}>Travail</button>
+                                    <button type="button" onClick={() => setNewTodoCategory('Ecole')} className={`w-full px-3 py-1 text-xs font-semibold rounded transition-colors ${newTodoCategory === 'Ecole' ? 'bg-white dark:bg-gray-700 text-accent-purple shadow' : 'text-gray-500'}`}>Ecole</button>
+                                </div>
+                            </form>
                         </Card>
 
                         <Card title="Nouvelle tâche" iconName="plus">
@@ -286,6 +304,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 <div>
                                     <label className="text-xs text-gray-500 dark:text-gray-400">Description courte...</label>
                                     <textarea value={newTaskDescription} onChange={e => setNewTaskDescription(e.target.value)} rows={2} className="w-full mt-1 bg-gray-100 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:ring-accent-blue focus:border-accent-blue"></textarea>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Catégorie</label>
+                                    <div className="flex rounded-md bg-gray-200 dark:bg-gray-800 p-1">
+                                        <button type="button" onClick={() => setNewTaskCategory('Travail')} className={`w-full px-3 py-1 text-sm font-semibold rounded transition-colors ${newTaskCategory === 'Travail' ? 'bg-white dark:bg-gray-700 text-accent-blue shadow' : 'text-gray-500'}`}>Travail</button>
+                                        <button type="button" onClick={() => setNewTaskCategory('Ecole')} className={`w-full px-3 py-1 text-sm font-semibold rounded transition-colors ${newTaskCategory === 'Ecole' ? 'bg-white dark:bg-gray-700 text-accent-purple shadow' : 'text-gray-500'}`}>Ecole</button>
+                                    </div>
                                 </div>
                                 <div className="flex gap-2">
                                     <select value={newTaskTime} onChange={e => setNewTaskTime(parseInt(e.target.value))} className="w-1/2 mt-1 bg-gray-100 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:ring-accent-blue focus:border-accent-blue">
@@ -305,7 +330,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                     {/* Column 2 */}
                     <div className="space-y-6">
-                        <Card title="Mes tâches" iconName="list" actions={activeTask ? <button onClick={onStartFocus} className="text-sm bg-accent-purple text-white px-3 py-1 rounded-full hover:bg-purple-500 flex items-center gap-1"><Icon name="focus" className="w-4 h-4"/> Mode Focus</button> : null}>
+                        <Card title="Mes tâches" iconName="list">
                              <div className="space-y-2" onDragLeave={handleTaskDragLeave}>
                              {tasks.map((task, index) => {
                                 const isBeingDragged = draggedItemIndex === index;
@@ -342,7 +367,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                     onDrop={(e) => handleTaskDrop(e, index)}
                                     onDragEnd={handleTaskDragEnd}
                                     onClick={() => setActiveTaskId(task.id)} 
-                                    className={`group p-3 rounded-lg transition-all ${isBeingDragged ? 'cursor-grabbing' : 'cursor-grab'} ${dropIndicatorClass} ${task.id === activeTask?.id ? 'bg-accent-indigo/10 dark:bg-accent-indigo/20 border border-accent-indigo/20 dark:border-accent-indigo/30' : 'bg-gray-100 dark:bg-gray-900/50 hover:bg-gray-200 dark:hover:bg-gray-800/60'} ${isBeingDragged ? 'opacity-30' : ''}`}
+                                    className={`group p-3 rounded-lg transition-all ${isBeingDragged ? 'cursor-grabbing' : 'cursor-grab'} ${dropIndicatorClass} ${task.id === activeTask?.id ? 'bg-accent-indigo/10 dark:bg-accent-indigo/20 border border-accent-indigo/20 dark:border-accent-indigo/30' : `bg-gray-100 dark:bg-gray-900/50 hover:bg-gray-200 dark:hover:bg-gray-800/60 border-l-4 ${categoryColorClasses[task.category].border}`} ${isBeingDragged ? 'opacity-30' : ''}`}
                                 >
                                     <div className="flex justify-between items-start">
                                         <div className="flex-grow">
@@ -383,7 +408,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             })}
                              </div>
                         </Card>
-                        <Card title="Tâche active" iconName="" className="bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/20">
+                        <Card 
+                            title="Tâche active" 
+                            iconName="focus"
+                            className="bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/20"
+                            actions={activeTask ? <button onClick={onStartFocus} className="text-sm bg-accent-purple text-white px-3 py-1 rounded-full hover:bg-purple-500 flex items-center gap-1"><Icon name="focus" className="w-4 h-4"/> Démarrer Focus</button> : null}
+                        >
                             {activeTask ? (
                             <>
                                 <div className="text-center">
@@ -428,27 +458,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                     <p className="text-2xl font-bold text-gray-900 dark:text-white">{avgDeviation.toFixed(0)}%</p>
                                 </div>
                             </div>
-                        </Card>
-                         <Card title="Historique des sessions" iconName="calendar">
-                            {sessionHistory.length === 0 ? (
-                                <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400 py-4">
-                                    <p className="text-sm">Aucune session de focus terminée.</p>
-                                </div>
-                            ) : (
-                                <ul className="space-y-3 max-h-48 overflow-y-auto pr-2">
-                                    {sessionHistory.map(session => (
-                                        <li key={session.id} className="flex justify-between items-center text-sm p-2 bg-gray-100 dark:bg-gray-900/50 rounded-md">
-                                            <div>
-                                                <p className="font-semibold text-gray-800 dark:text-gray-200 truncate max-w-[150px]">{session.taskTitle}</p>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">{session.completedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                            </div>
-                                            <span className="font-mono text-gray-800 dark:text-gray-200 bg-gray-200 dark:bg-[#121212] px-2 py-1 rounded">
-                                                {formatSessionDuration(session.durationSeconds)}
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
                         </Card>
                         <Card title="Blocage actuel ?" iconName="warning">
                              <textarea value={blockerNote} onChange={e => setBlockerNote(e.target.value)} rows={2} placeholder="Décrivez le problème rencontré..." className="w-full mt-1 bg-gray-100 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:ring-accent-blue focus:border-accent-blue"></textarea>

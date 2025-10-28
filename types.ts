@@ -1,8 +1,8 @@
-
 export interface Todo {
   id: number;
   text: string;
   completed: boolean;
+  category: TaskCategory;
 }
 
 export interface SubTask {
@@ -10,6 +10,8 @@ export interface SubTask {
   text: string;
   completed: boolean;
 }
+
+export type TaskCategory = 'Travail' | 'Ecole';
 
 export interface Task {
   id: number;
@@ -19,6 +21,7 @@ export interface Task {
   actualTime: number; // in seconds
   status: 'todo' | 'done';
   subTasks?: SubTask[];
+  category: TaskCategory;
 }
 
 export interface Session {

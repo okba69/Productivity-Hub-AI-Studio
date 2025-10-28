@@ -1,9 +1,8 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { FocusView } from './components/FocusView';
 import { Modal } from './components/Modal';
-import { Task, Session, DailySummary, Todo, View } from './types';
+import { Task, DailySummary, Todo, View, TaskCategory } from './types';
 
 const initialTasks: Task[] = [
   {
@@ -14,6 +13,7 @@ const initialTasks: Task[] = [
     actualTime: 0,
     status: 'todo',
     subTasks: [],
+    category: 'Travail',
   },
   {
     id: 2,
@@ -23,6 +23,7 @@ const initialTasks: Task[] = [
     actualTime: 900, // 15 minutes in seconds
     status: 'todo',
     subTasks: [],
+    category: 'Travail',
   },
   {
     id: 3,
@@ -32,6 +33,7 @@ const initialTasks: Task[] = [
     actualTime: 0,
     status: 'todo',
     subTasks: [],
+    category: 'Ecole',
   },
 ];
 
@@ -40,13 +42,12 @@ const App: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [activeTaskId, setActiveTaskId] = useState<number | null>(1);
   const [isFocusMode, setIsFocusMode] = useState(false);
-  const [sessionHistory, setSessionHistory] = useState<Session[]>([]);
   const [dailyHistory, setDailyHistory] = useState<DailySummary[]>([]);
 
   // State lifted from Dashboard
   const [todos, setTodos] = useState<Todo[]>([
-      { id: 1, text: 'Faire un mail à benjamin pour le dashboard finance', completed: true },
-      { id: 2, text: 'Dire à pierre pour la visite emlyon', completed: false },
+      { id: 1, text: 'Faire un mail à benjamin pour le dashboard finance', completed: true, category: 'Travail' },
+      { id: 2, text: 'Dire à pierre pour la visite emlyon', completed: false, category: 'Ecole' },
   ]);
   const [energy, setEnergy] = useState(7);
   const [satisfaction, setSatisfaction] = useState(5);
@@ -136,15 +137,6 @@ const App: React.FC = () => {
         actualTime: activeTask.actualTime + timeSpentInSeconds,
       };
       updateTask(updatedTask);
-
-      const newSession: Session = {
-        id: Date.now(),
-        taskId: activeTask.id,
-        taskTitle: activeTask.title,
-        durationSeconds: timeSpentInSeconds,
-        completedAt: new Date(),
-      };
-      setSessionHistory(prev => [newSession, ...prev].slice(0, 10));
     }
   };
 
@@ -158,9 +150,9 @@ const App: React.FC = () => {
   }, []);
   
   // Todo handlers
-  const addTodo = (text: string) => {
+  const addTodo = (text: string, category: TaskCategory) => {
     if (text.trim() !== '') {
-        setTodos([...todos, { id: Date.now(), text, completed: false }]);
+        setTodos([...todos, { id: Date.now(), text, completed: false, category }]);
     }
   };
 
@@ -211,7 +203,6 @@ const App: React.FC = () => {
     setTasks(remainingTasks);
     setActiveTaskId(remainingTasks.length > 0 ? remainingTasks[0].id : null);
     
-    setSessionHistory([]);
     setTodos([]); 
     setEnergy(7);
     setSatisfaction(5);
@@ -320,7 +311,6 @@ const App: React.FC = () => {
           reorderTasks={reorderTasks}
           deleteTask={deleteTask}
           reactivateTask={reactivateTask}
-          sessionHistory={sessionHistory}
           dailyHistory={dailyHistory}
           onDeleteDailySummary={requestDeleteDailySummary}
           onNewDay={openNewDayModal}
