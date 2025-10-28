@@ -1,0 +1,5 @@
+{
+  "name": "ProductivityHub",
+  "description": "A dashboard to track tasks, manage focus sessions, and monitor daily productivity KPIs. It includes a to-do list, task management, an active task timer, and a full-screen focus mode.",
+  "requestFramePermissions": []
+}
